@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>工资查询</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f6f8;color:#1f2329;padding:12px;font-size:14px}
+  .wrap{max-width:1100px;margin:0 auto}
+  h1{font-size:18px;margin-bottom:4px}
+  .sub{font-size:12px;color:#86909c;margin-bottom:14px}
+  .card{background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .card h2{font-size:15px;margin-bottom:12px;padding-left:8px;border-left:3px solid #165dff}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:12px}
+  .field{display:flex;flex-direction:column;gap:3px;flex:1;min-width:100px}
+  .field label{font-size:11px;color:#86909c}
+  select,input{height:38px;padding:0 10px;border:1px solid #d9dce0;border-radius:8px;font-size:14px;background:#fff;outline:none;width:100%}
+  select:focus,input:focus{border-color:#165dff;box-shadow:0 0 0 2px rgba(22,93,255,.1)}
+  button{height:38px;padding:0 16px;border:none;border-radius:8px;background:#165dff;color:#fff;font-size:14px;cursor:pointer;white-space:nowrap}
+  button.ghost{background:#f2f3f5;color:#4e5969}
+  button.danger{background:#f53f3f}
+  button.mini{height:30px;padding:0 10px;font-size:12px}
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}
+  th,td{padding:8px 10px;text-align:right;border-bottom:1px solid #f0f2f5}
+  th{background:#f7f8fa;color:#4e5969;font-weight:600;position:sticky;top:0}
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){text-align:left}
+  tbody tr:hover{background:#f7f9ff}
+  .net{color:#165dff;font-weight:700}
+  .empty{text-align:center;color:#86909c;padding:30px 0}
+  .summary{display:flex;flex-wrap:wrap;gap:14px;padding:12px;background:#f7f9ff;border-radius:8px;margin-top:12px;font-size:13px}
+  .summary b{color:#165dff;font-size:15px;margin-left:4px}
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:99}
+  .modal-mask.show{display:flex}
+  .modal{background:#fff;border-radius:12px;padding:20px;max-width:440px;width:100%;max-height:85vh;overflow-y:auto}
+  .modal h3{font-size:16px;margin-bottom:4px}
+  .modal .meta{font-size:12px;color:#86909c;margin-bottom:14px}
+  .payslip-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #e5e6eb;font-size:13px}
+  .payslip-total{display:flex;justify-content:space-between;margin-top:12px;padding:10px;background:#f7f9ff;border-radius:8px;font-size:15px;font-weight:700;color:#165dff}
+  .badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;background:#e8f3ff;color:#165dff;margin-left:6px}
+  .tip{font-size:11px;color:#86909c;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>工资查询</h1>
+  <p class="sub">已收录 2026年7月、8月工资数据，可按姓名或月份查询。</p>
+
+  <!-- 查询区 -->
+  <div class="card">
+    <h2>🔍 工资查询</h2>
+    <div class="toolbar">
+      <div class="field"><label>姓名</label><select id="qEmp"><option value="">全部</option></select></div>
+      <div class="field"><label>月份</label><select id="qMonth"><option value="">全部</option></select></div>
+      <button onclick="renderQuery()">查询</button>
+      <button class="ghost" onclick="resetQuery()">重置</button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>月份</th><th>姓名</th><th>账号</th>
+          <th>基本工资</th><th>基础绩效</th><th>提成工资</th>
+          <th>应发金额</th><th>社保扣除</th><th>个税扣除</th><th>实发金额</th><th>操作</th>
+        </tr></thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+    <div class="summary" id="summaryBox"></div>
+  </div>
+
+  <!-- 全部明细 -->
+  <div class="card">
+    <h2>📋 全部工资明细 <span class="badge" id="countBadge">0</span></h2>
+    <div class="toolbar">
+      <button class="ghost" onclick="exportCSV()">导出CSV</button>
+      <label class="ghost" style="display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:8px;background:#f2f3f5;color:#4e5969;font-size:14px;cursor:pointer;">
+        导入CSV<input type="file" accept=".csv" style="display:none" onchange="importCSV(event)">
+      </label>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>月份</th><th>姓名</th><th>账号</th>
+          <th>基本工资</th><th>基础绩效</th><th>提成工资</th>
+          <th>应发金额</th><th>社保扣除</th><th>个税扣除</th><th>实发金额</th><th>操作</th>
+        </tr></thead>
+        <tbody id="allBody"></tbody>
+      </table>
+    </div>
+    <p class="tip">导入CSV表头：月份,姓名,账号,基本工资,基础绩效,提成工资,自费社保差额,社保扣除,个税扣除,应出勤天数,实际出勤天数</p>
+  </div>
+</div>
+
+<!-- 工资条弹窗 -->
+<div class="modal-mask" id="modalMask" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<script>
+const KEY='salary_qiwei_v2';
+let data=[];
+
+/* ===== 内置7月+8月数据 ===== */
+const SEED = [
+  /* 2026年7月 */
+  {month:'2026-07',name:'杨福文',account:'YangFuWen',base:2520,perf:2480,attReq:24,attAct:24,comm:0,selfDiff:0,social:521.58,tax:0},
+  {month:'2026-07',name:'吴市城',account:'ChengDian',base:2520,perf:2480,attReq:24,attAct:24,comm:0,selfDiff:0,social:521.58,tax:0},
+  {month:'2026-07',name:'余年华',account:'YuNianHua',base:2520,perf:7480,attReq:24,attAct:24,comm:10215.42,selfDiff:0,social:420.68,tax:0},
+  {month:'2026-07',name:'李娟',account:'',base:2520,perf:2480,attReq:24,attAct:24,comm:0,selfDiff:0,social:420.68,tax:0},
+  {month:'2026-07',name:'彭雪峰',account:'',base:2520,perf:2480,attReq:24,attAct:24,comm:0,selfDiff:0,social:1770.15,tax:0},
+  {month:'2026-07',name:'陶利红',account:'',base:2520,perf:2480,attReq:24,attAct:4,comm:0,selfDiff:0,social:0,tax:0},
+  {month:'2026-07',name:'杨佩洁',account:'',base:2520,perf:0,attReq:24,attAct:5,comm:0,selfDiff:0,social:0,tax:0},
+  {month:'2026-07',name:'周志荞',account:'',base:2520,perf:5480,attReq:24,attAct:24,comm:0,selfDiff:302.71,social:521.58,tax:65.27},
+  {month:'2026-07',name:'朱婷',account:'foxxyuan',base:2520,perf:5480,attReq:24,attAct:21,comm:0,selfDiff:302.71,social:521.58,tax:0},
+  /* 2026年8月 */
+  {month:'2026-08',name:'李娟',account:'',base:2520,perf:2480,attReq:24,attAct:24,comm:0,selfDiff:0,social:420.68,tax:0},
+  {month:'2026-08',name:'刘一宇',account:'',base:2520,perf:1480,attReq:24,attAct:20,comm:0,selfDiff:0,social:0,tax:0},
+  {month:'2026-08',name:'欧基柱',account:'',base:2520,perf:1480,attReq:24,attAct:4,comm:0,selfDiff:0,social:0,tax:0},
+  {month:'2026-08',name:'彭雪峰',account:'',base:2520,perf:2480,attReq:24,attAct:2,comm:0,selfDiff:0,social:0,tax:0},
+  {month:'2026-08',name:'陶利红',account:'',base:2520,perf:2480,attReq:24,attAct:24,comm:0,selfDiff:0,social:420.68,tax:0},
+  {month:'2026-08',name:'吴市城',account:'ChengDian',base:2520,perf:2480,attReq:24,attAct:24,comm:0,selfDiff:0,social:521.58,tax:0},
+  {month:'2026-08',name:'杨福文',account:'YangFuWen',base:2520,perf:2480,attReq:24,attAct:24,comm:0,selfDiff:0,social:521.58,tax:0},
+  {month:'2026-08',name:'杨佩洁',account:'',base:2520,perf:0,attReq:24,attAct:21,comm:0,selfDiff:0,social:0,tax:0},
+  {month:'2026-08',name:'叶玉堂',account:'',base:2520,perf:1480,attReq:24,attAct:4,comm:0,selfDiff:0,social:0,tax:0},
+  {month:'2026-08',name:'余年华',account:'YuNianHua',base:2520,perf:7480,attReq:24,attAct:24,comm:4238.96,selfDiff:0,social:420.68,tax:263.69},
+  {month:'2026-08',name:'周志荞',account:'',base:2520,perf:4480,attReq:24,attAct:21.5,comm:0,selfDiff:302.71,social:521.58,tax:13.4},
+  {month:'2026-08',name:'朱婷',account:'foxxyuan',base:2520,perf:4480,attReq:24,attAct:24,comm:0,selfDiff:302.71,social:521.58,tax:0}
+];
+
+/* ===== 计算 ===== */
+function compute(r){
+  const base=+r.base||0, perf=+r.perf||0, attReq=+r.attReq||24, attAct=+r.attAct||0;
+  const comm=+r.comm||0, selfDiff=+r.selfDiff||0, social=+r.social||0, tax=+r.tax||0;
+  const gross=(base+perf)/attReq*attAct+comm-selfDiff;
+  const net=gross-social-tax;
+  return {gross,net,social,tax};
+}
+
+/* ===== 存储 ===== */
+function load(){
+  try{
+    const stored=JSON.parse(localStorage.getItem(KEY));
+    if(stored&&stored.length){data=stored;return}
+  }catch(e){}
+  data=SEED.map((item,i)=>({id:'s'+i+'_'+Date.now(),...item}));
+  save();
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+function fmt(n){n=Number(n)||0;return n.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+
+/* ===== 筛选 ===== */
+function getFiltered(){
+  const emp=document.getElementById('qEmp').value;
+  const mon=document.getElementById('qMonth').value;
+  return data.filter(r=>(!emp||r.name===emp)&&(!mon||r.month===mon));
+}
+
+/* ===== 渲染查询结果 ===== */
+function renderQuery(){
+  const rows=getFiltered().sort((a,b)=>a.month===b.month?a.name.localeCompare(b.name):b.month.localeCompare(a.month));
+  const tb=document.getElementById('resultBody');
+  tb.innerHTML='';
+  if(!rows.length){
+    tb.innerHTML='<tr><td colspan="11" class="empty">没有匹配记录</td></tr>';
+    document.getElementById('summaryBox').style.display='none';
+    return;
+  }
+  let sg=0,ss=0,st=0,sn=0;
+  rows.forEach(r=>{
+    const c=compute(r);
+    sg+=c.gross;ss+=c.social;st+=c.tax;sn+=c.net;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${r.month}</td><td>${r.name}</td><td>${r.account||'-'}</td>
+      <td>${fmt(r.base)}</td><td>${fmt(r.perf)}</td><td>${fmt(r.comm)}</td>
+      <td>${fmt(c.gross)}</td><td>${fmt(c.social)}</td><td>${fmt(c.tax)}</td>
+      <td class="net">${fmt(c.net)}</td>
+      <td><button class="mini ghost" onclick="showPayslip('${r.id}')">工资条</button></td>`;
+    tb.appendChild(tr);
+  });
+  const box=document.getElementById('summaryBox');
+  box.style.display='flex';
+  box.innerHTML=`
+    <div>记录数：<b>${rows.length}</b></div>
+    <div>应发合计：<b>${fmt(sg)}</b></div>
+    <div>社保合计：<b>${fmt(ss)}</b></div>
+    <div>个税合计：<b>${fmt(st)}</b></div>
+    <div>实发合计：<b>${fmt(sn)}</b></div>`;
+}
+
+/* ===== 渲染全部明细 ===== */
+function renderAll(){
+  const tb=document.getElementById('allBody');
+  tb.innerHTML='';
+  document.getElementById('countBadge').textContent=data.length;
+  if(!data.length){
+    tb.innerHTML='<tr><td colspan="11" class="empty">暂无数据</td></tr>';
+    return;
+  }
+  data.slice().sort((a,b)=>a.month===b.month?a.name.localeCompare(b.name):b.month.localeCompare(a.month)).forEach(r=>{
+    const c=compute(r);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${r.month}</td><td>${r.name}</td><td>${r.account||'-'}</td>
+      <td>${fmt(r.base)}</td><td>${fmt(r.perf)}</td><td>${fmt(r.comm)}</td>
+      <td>${fmt(c.gross)}</td><td>${fmt(c.social)}</td><td>${fmt(c.tax)}</td>
+      <td class="net">${fmt(c.net)}</td>
+      <td><button class="mini danger" onclick="delRecord('${r.id}')">删除</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+/* ===== 下拉选项 ===== */
+function renderOptions(){
+  const names=[...new Set(data.map(r=>r.name))].sort();
+  const months=[...new Set(data.map(r=>r.month))].sort().reverse();
+  const qEmp=document.getElementById('qEmp');
+  const ke=qEmp.value;
+  qEmp.innerHTML='<option value="">全部</option>'+names.map(n=>`<option value="${n}">${n}</option>`).join('');
+  qEmp.value=ke;
+  const qMonth=document.getElementById('qMonth');
+  const km=qMonth.value;
+  qMonth.innerHTML='<option value="">全部</option>'+months.map(m=>`<option value="${m}">${m}</option>`).join('');
+  qMonth.value=km;
+}
+
+function renderAll3(){renderOptions();renderQuery();renderAll()}
+
+/* ===== 删除 ===== */
+function delRecord(id){
+  if(!confirm('确定删除这条记录？'))return;
+  data=data.filter(r=>r.id!==id);
+  save();renderAll3();
+}
+function resetQuery(){
+  document.getElementById('qEmp').value='';
+  document.getElementById('qMonth').value='';
+  renderQuery();
+}
+
+/* ===== 工资条 ===== */
+function showPayslip(id){
+  const r=data.find(x=>x.id===id);
+  if(!r)return;
+  const c=compute(r);
+  document.getElementById('modalBox').innerHTML=`
+    <h3>${r.name} 的工资条</h3>
+    <p class="meta">${r.month} · ${r.account||'无账号'}</p>
+    <div class="payslip-row"><span>基本工资</span><span>${fmt(r.base)}</span></div>
+    <div class="payslip-row"><span>基础绩效</span><span>${fmt(r.perf)}</span></div>
+    <div class="payslip-row"><span>应出勤 / 实际出勤</span><span>${r.attReq||24} / ${r.attAct||0} 天</span></div>
+    <div class="payslip-row"><span>提成工资</span><span>${fmt(r.comm)}</span></div>
+    <div class="payslip-row"><span>自费社保升档差额</span><span>${fmt(r.selfDiff)}</span></div>
+    <div class="payslip-row"><span><b>应发金额</b></span><span><b>${fmt(c.gross)}</b></span></div>
+    <div class="payslip-row"><span>社保扣除</span><span>-${fmt(c.social)}</span></div>
+    <div class="payslip-row"><span>个税扣除</span><span>-${fmt(c.tax)}</span></div>
+    <div class="payslip-total"><span>实发金额</span><span>¥ ${fmt(c.net)}</span></div>
+    <button class="ghost" style="width:100%;margin-top:14px" onclick="closeModal()">关闭</button>`;
+  document.getElementById('modalMask').classList.add('show');
+}
+function closeModal(){document.getElementById('modalMask').classList.remove('show')}
+
+/* ===== CSV 导入导出 ===== */
+const HEAD=['月份','姓名','账号','基本工资','基础绩效','提成工资','自费社保差额','社保扣除','个税扣除','应出勤天数','实际出勤天数'];
+function exportCSV(){
+  if(!data.length){alert('暂无数据');return}
+  const lines=[HEAD.join(',')];
+  data.forEach(r=>{
+    lines.push([r.month,r.name,r.account,r.base,r.perf,r.comm,r.selfDiff,r.social,r.tax,r.attReq,r.attAct].map(v=>{
+      const s=String(v??'');
+      return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+    }).join(','));
+  });
+  const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='工资表_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();URL.revokeObjectURL(a.href);
+}
+function importCSV(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const text=ev.target.result.replace(/^\ufeff/,'');
+    const rows=parseCSV(text);
+    if(rows.length<2){alert('文件为空');return}
+    let added=0;
+    for(let i=1;i<rows.length;i++){
+      const c=rows[i];
+      if(!c[0]&&!c[1])continue;
+      data.push({
+        id:'r'+Date.now()+Math.random().toString(36).slice(2,7)+i,
+        month:(c[0]||'').trim(),name:(c[1]||'').trim(),account:(c[2]||'').trim(),
+        base:+c[3]||0,perf:+c[4]||0,comm:+c[5]||0,selfDiff:+c[6]||0,
+        social:+c[7]||0,tax:+c[8]||0,attReq:+c[9]||24,attAct:+c[10]||0
+      });
+      added++;
+    }
+    save();renderAll3();
+    alert('成功导入 '+added+' 条记录');
+    e.target.value='';
+  };
+  reader.readAsText(file,'UTF-8');
+}
+function parseCSV(text){
+  const rows=[];let row=[],cur='',inQ=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(inQ){
+      if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++}else inQ=false}
+      else cur+=ch;
+    }else{
+      if(ch==='"')inQ=true;
+      else if(ch===','){row.push(cur);cur=''}
+      else if(ch==='\n'){row.push(cur);rows.push(row);row=[];cur=''}
+      else if(ch!=='\r')cur+=ch;
+    }
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row)}
+  return rows.filter(r=>r.some(v=>String(v).trim()!==''));
+}
+
+/* ===== 初始化 ===== */
+load();
+renderAll3();
+document.getElementById('qEmp').addEventListener('change',renderQuery);
+document.getElementById('qMonth').addEventListener('change',renderQuery);
+</script>
+</body>
+</html>
